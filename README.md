@@ -14,3 +14,11 @@ The uImage file was created with:
 make uImage LOADADDR=0x80008000
 
 All other configuration options can be found in the config-5.4.257 config file in the archive.
+
+The configuration in the current uploaded image files was generated with:
+
+$ make ARCH=arm defconfig
+$ make ARCH=arm nconfig
+
+Notes: The default config does not have kvm enabled, so the configuration was edited to enable it with make nconfig
+       This also required enabling CONFIG_ARM_LPAE and CONFIG_VIRTUALIZATION before CONFIG_KVM could be enabled.

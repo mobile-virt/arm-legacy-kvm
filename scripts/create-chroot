@@ -3,6 +3,7 @@
 # Chroot distro settings
 DEBIAN_URL=http://deb.debian.org/debian
 DEBRELEASE=bookworm
+error=n
 
 CHROOT_NAME=$1
 if [ ! ${CHROOT_NAME} ]; then echo "error: no chroot name given on command line"; exit 1; fi
@@ -11,6 +12,11 @@ CHROOT_DIR=/srv/chroot/${CHROOT_NAME}
 PKG_CACHE_DIR=/srv/chroot/${CHROOT_NAME}-pkg-cache
 
 if [ -e ${CHROOT_DIR} ]; then echo "error: chroot ${CHROOT_NAME} already exists"; exit 1; fi
+
+# Check if debootstrap is installed
+ls /usr/sbin/debootstrap | grep deb || error=y
+if [ x${error} = xy ]; then echo "error: debootstrap is not installed"; exit 1; fi
+error=n
 
 # Create a PKG_CACHE_DIR (it will be bind mounted at /var/cache/apt/archives in the chroot)
 if [ ! -e ${PKG_CACHE_DIR} ]; then
@@ -22,7 +28,7 @@ fi
 # Create the chroot directory and debootstrap it
 mkdir -p ${CHROOT_DIR}/var/cache/apt/archives
 mount --bind ${PKG_CACHE_DIR} ${CHROOT_DIR}/var/cache/apt/archives
-debootstrap ${DEBRELEASE} ${CHROOT_DIR} ${DEBIAN_URL}; echo "Done bootstrapping Debian"
+debootstrap ${DEBRELEASE} ${CHROOT_DIR} ${DEBIAN_URL} && echo "Done bootstrapping Debian"
 
 # Bind mounts
 mount | grep ${CHROOT_DIR}/proc || mount --bind /proc ${CHROOT_DIR}/proc

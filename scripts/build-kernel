@@ -110,6 +110,9 @@ chroot ${CHROOT_DIR} su - -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; tar rfp li
 rm -rf boot
 gzip linux-${KERNELRELEASE}-${ARCH}.tar
 mv linux-${KERNELRELEASE}-${ARCH}.tar.gz ..
+popd
+
+echo "Build script completed. Result of build: ${BUILD_DIR}/linux-${KERNELRELEASE}-${ARCH}.tar.gz"
 
 # After build, login to look at the build
 need_root=N

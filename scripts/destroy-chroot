@@ -1,0 +1,42 @@
+#!/bin/bash
+
+CHROOT_NAME=$1
+if [ ! ${CHROOT_NAME} ]; then echo "error: no chroot name given on command line"; exit 1; fi
+
+CHROOT_DIR=/srv/chroot/${CHROOT_NAME}
+PKG_CACHE_DIR=/srv/chroot/${CHROOT_NAME}-pkg-cache
+
+if [ ! -e ${CHROOT_DIR} ]; then echo "error: chroot ${CHROOT_NAME} not found"; exit 1; fi
+if [ ! -e ${PKG_CACHE_DIR} ]; then echo "error: chroot ${CHROOT_NAME} has no package cache"; exit 1; fi
+
+# build directory
+if [ ${SUDO_USER} ]; then
+    BUILD_DIR=/home/${SUDO_USER}/kernelbuild
+    if [ ! -e /home/${SUDO_USER} ]; then
+        # This is not a user who has used the chroot, so this user cannot destroy it
+        echo "error: ${SUDO_USER} is not a user of chroot ${CHROOT_NAME}"
+    fi
+else
+    BUILD_DIR=/root/kernelbuild
+fi
+
+# Check if anything is mounted in the chroot
+inuse=no
+mount | grep ${CHROOT_DIR}/var/cache/apt/archives && inuse=yes
+mount | grep ${CHROOT_DIR}/proc && inuse=yes
+mount | grep ${CHROOT_DIR}/sys && inuse=yes
+mount | grep ${CHROOT_DIR}/dev && inuse=yes
+mount | grep ${CHROOT_DIR}/dev/pts && inuse=yes
+mount | grep ${CHROOT_DIR}${BUILD_DIR} && inuse=yes
+if [ x${inuse} = xyes ]; then echo "error: chroot ${CHROOT_NAME} is in use, cannot destroy it"; exit 1; fi
+
+destroy=N
+echo "Ready to destroy chroot ${CHROOT_NAME}, are you sure (N/y)?"
+read -n 1 destroy
+if [ x${destroy} = xy ]; then
+    rm -rf ${CHROOT_DIR}
+fi
+
+echo "Successfully destroyed chroot ${CHROOT_NAME}"
+
+exit 0

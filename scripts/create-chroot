@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Chroot distro settings
+DEBIAN_URL=http://deb.debian.org/debian
+DEBRELEASE=bookworm
+
+CHROOT_NAME=$1
+if [ ! ${CHROOT_NAME} ]; then echo "error: no chroot name given on command line"; exit 1; fi
+
+CHROOT_DIR=/srv/chroot/${CHROOT_NAME}
+PKG_CACHE_DIR=/srv/chroot/${CHROOT_NAME}-pkg-cache
+
+if [ -e ${CHROOT_DIR} ]; then echo "error: chroot ${CHROOT_NAME} already exists"; exit 1; fi
+
+# Create a PKG_CACHE_DIR (it will be bind mounted at /var/cache/apt/archives in the chroot)
+if [ ! -e ${PKG_CACHE_DIR} ]; then
+    mkdir -p ${PKG_CACHE_DIR}
+else
+    echo "Using existing package cache for chroot ${CHROOT_NAME}"
+fi
+
+# Create the chroot directory and debootstrap it
+mkdir -p ${CHROOT_DIR}/var/cache/apt/archives
+mount --bind ${PKG_CACHE_DIR} ${CHROOT_DIR}/var/cache/apt/archives
+debootstrap ${DEBRELEASE} ${CHROOT_DIR} ${DEBIAN_URL}; echo "Done bootstrapping Debian"
+
+# Bind mounts
+mount | grep ${CHROOT_DIR}/proc || mount --bind /proc ${CHROOT_DIR}/proc
+mount | grep ${CHROOT_DIR}/sys || mount --bind /sys ${CHROOT_DIR}/sys
+mount | grep ${CHROOT_DIR}/dev || mount --bind /dev ${CHROOT_DIR}/dev
+mount | grep ${CHROOT_DIR}/dev/pts || mount --bind /dev/pts ${CHROOT_DIR}/dev/pts
+
+# Enter the chroot and install some more necessary and useful packages
+echo "locales locales/default_environment_locale select en_US.UTF-8" | \
+chroot ${CHROOT_DIR} debconf-set-selections
+echo "locales locales/locales_to_be_generated multiselect en_US.UTF-8 UTF-8" | \
+chroot ${CHROOT_DIR} debconf-set-selections
+chroot ${CHROOT_DIR} apt-get install -y locales
+chroot ${CHROOT_DIR} apt-get install -y curl
+chroot ${CHROOT_DIR} apt-get install -y initramfs-tools
+
+# Kernel version 5.4 does not support zstd initrd compression, so change it to lz4
+cat ${CHROOT_DIR}/etc/initramfs-tools/initramfs.conf | \
+sed s/=zstd/=lz4/ > ${CHROOT_DIR}/etc/initramfs-tools/initramfs.conf.tmp
+mv ${CHROOT_DIR}/etc/initramfs-tools/initramfs.conf ${CHROOT_DIR}/etc/initramfs-tools/initramfs.conf.orig
+mv ${CHROOT_DIR}/etc/initramfs-tools/initramfs.conf.tmp ${CHROOT_DIR}/etc/initramfs-tools/initramfs.conf
+
+# Install the essential build package and the linux kernel build depends packages 
+chroot ${CHROOT_DIR} apt-get install -y build-essential
+echo $(cat ${CHROOT_DIR}/etc/apt/sources.list | sed s/deb/deb-src/) >> ${CHROOT_DIR}/etc/apt/sources.list
+chroot ${CHROOT_DIR} apt-get update
+chroot ${CHROOT_DIR} apt-get build-dep -y linux
+
+# Detect if we need to cross-compile
+chroot ${CHROOT_DIR} dpkg-architecture | grep DEB_BUILD_ARCH | grep armhf || CROSS=true
+if [ ${CROSS} ]; then
+    echo "export CROSS_COMPILE=arm-linux-gnueabihf-" > ${CHROOT_DIR}/etc/profile.d/cross.sh
+    echo "export ARCH=arm" >> ${CHROOT_DIR}/etc/profile.d/cross.sh
+    chroot ${CHROOT_DIR} apt-get install -y crossbuild-essential-armhf
+fi
+# Install libncurses-dev for make nconfig, u-boot-tools for make uImage, rpm for rpm-pkg target
+chroot ${CHROOT_DIR} apt-get install -y libncurses-dev
+chroot ${CHROOT_DIR} apt-get install -y u-boot-tools
+chroot ${CHROOT_DIR} apt-get install -y rpm
+
+# Enable building without root privileges and use SUDO_USER if SUDO_USER exists
+if [ ${SUDO_USER} ]; then
+    chroot ${CHROOT_DIR} adduser --uid ${SUDO_UID} --home /home/${SUDO_USER} --shell /bin/bash ${SUDO_USER}
+fi
+
+# After initial setup, login to look inside the chroot and make sure everything is OK
+need_root=N
+if [ ${SUDO_USER} ]; then
+    chroot ${CHROOT_DIR} su - ${SUDO_USER}
+    echo "Do you need to make changes to the chroot that require root privileges (N/y)?"
+    read -n 1 need_root
+else
+    chroot ${CHROOT_DIR} su -
+fi
+
+if [ x${need_root} = xy ]; then
+    chroot ${CHROOT_DIR} su -
+fi
+
+# When finished, umount the bind mounts
+umount ${CHROOT_DIR}/var/cache/apt/archives
+umount ${CHROOT_DIR}/proc
+umount ${CHROOT_DIR}/sys
+umount ${CHROOT_DIR}/dev/pts
+umount ${CHROOT_DIR}/dev
+
+exit 0

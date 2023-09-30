@@ -1,0 +1,36 @@
+--- a/scripts/package/buildtar	2023-09-23 05:00:07.000000000 -0400
++++ b/scripts/package/buildtar	2023-09-29 15:09:19.189273025 -0400
+@@ -61,13 +61,22 @@
+ 	dirs="$dirs lib"
+ fi
+ 
++#
++# Try to install dtbs
++#
++if grep -q '^CONFIG_OF_EARLY_FLATTREE=y' include/config/auto.conf; then
++	# Only some architectures with OF support have this target
++	if [ -d "${srctree}/arch/${ARCH}/boot/dts" ]; then
++		make ARCH="${ARCH}" -f ${srctree}/Makefile INSTALL_DTBS_PATH="${tmpdir}/boot/dtbs" dtbs_install
++	fi
++fi
+ 
+ #
+ # Install basic kernel files
+ #
+ cp -v -- "${objtree}/System.map" "${tmpdir}/boot/System.map-${KERNELRELEASE}"
+ cp -v -- "${KCONFIG_CONFIG}" "${tmpdir}/boot/config-${KERNELRELEASE}"
+-cp -v -- "${objtree}/vmlinux" "${tmpdir}/boot/vmlinux-${KERNELRELEASE}"
++#cp -v -- "${objtree}/vmlinux" "${tmpdir}/boot/vmlinux-${KERNELRELEASE}"
+ 
+ 
+ #
+@@ -113,6 +122,9 @@
+ 			fi
+ 		done
+ 		;;
++	arm)
++		[ -f "${objtree}/arch/arm/boot/zImage" ] && cp -v -- "${objtree}/arch/arm/boot/zImage" "${tmpdir}/boot/vmlinuz-${KERNELRELEASE}"
++		;;
+ 	*)
+ 		[ -f "${KBUILD_IMAGE}" ] && cp -v -- "${KBUILD_IMAGE}" "${tmpdir}/boot/vmlinux-kbuild-${KERNELRELEASE}"
+ 		echo "" >&2

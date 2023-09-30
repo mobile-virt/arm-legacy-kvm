@@ -1,0 +1,80 @@
+#!/bin/bash
+
+CHROOT_NAME=$1
+if [ ! ${CHROOT_NAME} ]; then echo "error: no chroot name given on command line"; exit 1; fi
+
+CHROOT_DIR=/srv/chroot/${CHROOT_NAME}
+PKG_CACHE_DIR=/srv/chroot/${CHROOT_NAME}-pkg-cache
+
+if [ ! -e ${CHROOT_DIR} ]; then echo "error: chroot ${CHROOT_NAME} not found"; exit 1; fi
+if [ ! -e ${PKG_CACHE_DIR} ]; then echo "error: chroot ${CHROOT_NAME} has no package cache"; exit 1; fi
+
+# build directory
+if [ ${SUDO_USER} ]; then
+    BUILD_DIR=/home/${SUDO_USER}/kernelbuild
+    if [ ! -e /home/${SUDO_USER} ]; then
+        # This is not the user who created the chroot, so we create this user in the chroot
+        chroot ${CHROOT_DIR} adduser --uid ${SUDO_UID} --home /home/${SUDO_USER} --shell /bin/bash ${SUDO_USER}
+    fi
+else
+    BUILD_DIR=/root/kernelbuild
+fi
+
+# setup the build directory on the host
+if [ ! -e ${BUILD_DIR} ]; then
+    echo "Creating build directory ${BUILD_DIR} for chroot ${CHROOT_NAME}"
+    mkdir -p ${BUILD_DIR}
+    if [ ${SUDO_UID} ]; then chown ${SUDO_UID} ${BUILD_DIR}; fi
+else
+    echo "Using existing build directory ${BUILD_DIR} for chroot ${CHROOT_NAME} in the host"
+fi
+
+# setup the build directory in the chroot
+if [ ! -e ${CHROOT_DIR}${BUILD_DIR} ]; then
+    echo "Creating build directory ${CHROOT_DIR}${BUILD_DIR} for chroot ${CHROOT_NAME}"
+    mkdir -p ${CHROOT_DIR}${BUILD_DIR}
+    if [ ${SUDO_UID} ]; then chown ${SUDO_UID} ${CHROOT_DIR}${BUILD_DIR}; fi
+else
+    echo "Using existing build directory ${CHROOT_DIR}${BUILD_DIR} for chroot ${CHROOT_NAME} in the chroot"
+fi
+
+# If the build directory can be mounted in the host filesystem and it's not mounted, mount it
+# This will require an entry for ${BUILD_DIR} in /etc/fstab or similar but this is
+# entirely optional but might be useful when additional disk space is needed for the build
+mount | grep ${BUILD_DIR} || mount ${BUILD_DIR} && \
+echo "Build dir ${BUILD_DIR} mounted in the host filesystem"
+
+# Bind mounts
+mount | grep ${CHROOT_DIR}/var/cache/apt/archives || \
+mount --bind ${PKG_CACHE_DIR} ${CHROOT_DIR}/var/cache/apt/archives
+mount | grep ${CHROOT_DIR}/proc || mount --bind /proc ${CHROOT_DIR}/proc
+mount | grep ${CHROOT_DIR}/sys || mount --bind /sys ${CHROOT_DIR}/sys
+mount | grep ${CHROOT_DIR}/dev || mount --bind /dev ${CHROOT_DIR}/dev
+mount | grep ${CHROOT_DIR}/dev/pts || mount --bind /dev/pts ${CHROOT_DIR}/dev/pts
+mount | grep ${CHROOT_DIR}${BUILD_DIR} || mount --bind ${BUILD_DIR} ${CHROOT_DIR}${BUILD_DIR}
+
+ARCH=arm
+
+# Login to look inside the chroot and make sure everything is correct
+need_root=N
+if [ ${SUDO_USER} ]; then
+    chroot ${CHROOT_DIR} su - ${SUDO_USER}
+    echo "Do you need to make changes to the chroot that require root privileges (N/y)?"
+    read -n 1 need_root
+else
+    chroot ${CHROOT_DIR} su -
+fi
+
+if [ x${need_root} = xy ]; then
+    chroot ${CHROOT_DIR} su -
+fi
+
+# When finished, umount the bind mounts
+umount ${CHROOT_DIR}/var/cache/apt/archives
+umount ${CHROOT_DIR}/proc
+umount ${CHROOT_DIR}/sys
+umount ${CHROOT_DIR}/dev/pts
+umount ${CHROOT_DIR}/dev
+umount ${CHROOT_DIR}${BUILD_DIR}
+
+exit 0

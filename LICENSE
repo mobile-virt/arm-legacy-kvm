@@ -1,12 +1,24 @@
-This repository is composed of scripts, patches, and configuration files needed to compile the Linux kernel with kvm support enabled for use on armv7 32-bit devices that have the capability of using the Linux kvm virtualization system.
+This repository is composed of scripts, patches, and configuration
+files needed to compile the Linux kernel with kvm support enabled
+for use on armv7 32-bit devices that have the capability of using
+the Linux kvm virtualization system.
 
-The patches are subject to the copyrights, licenses, and any other agreements associated with the patched files. The configuration files for a particular Linux kernel build are part of the source code for that kernel and are subject to the license under which the Linux kernel is developed, distributed, and used.
+The patches are subject to the copyrights, licenses, and any other
+agreements associated with the patched files. The configuration files
+for a particular Linux kernel build are part of the source code for
+that kernel and are subject to the license under which the Linux
+kernel is developed, distributed, and used.
 
-The scripts in this repository are designed to execute programs on a computer system in order to build the Linu kernel. They are not copyrighted and are intended to be made available for use in the public domain.
+The scripts in this repository are designed to execute programs on
+a computer system in order to build the Linu kernel. They are not
+copyrighted and are intended to be made available for use in the
+public domain.
 
-Please refer to the COPYING file in the top-level directory of the Linux kernel source tree for full licensing details. 
+Please refer to the COPYING file in the top-level directory of the
+Linux kernel source tree for full licensing details. 
 
-The text of the GNU GPL version 2 is reproduced here since most of the Linux kernel is under the terms of that license.
+The text of the GNU GPL version 2 is reproduced here since most of
+the Linux kernel is under the terms of that license.
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991

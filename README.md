@@ -1,7 +1,9 @@
 # arm-legacy-kvm
-This repository is for enabling support for kvm on older devices, it is a work in progress.
+This repository is for enabling support for kvm on older devices and is inspired by the work of @Marietto2008 to improve support for virtualization on arm chromebooks and related arm devices. This repository is specifically for supporting kvm on arm 32-bit chromebooks such as the chromebook snow (SAMSUNG XE303C12-A01US Samsung Series 3 Chromebook XE303C12 - Exynos 5 1.7 GHz).
 
-This repository currently has released builds of the linux kernel version 5.4.257 with kvm support for armv7 using source from this location:
+Thanks to @Marietto2008 for testing and debugging work that has resulted in discovering important Linux kernel build parameters such as the correct settings in the config file, the correct setting of the uImage LOADADDR, the kernel and u-boot versions that have kvm support, and many other helpful hints.
+
+This repository is for building the Linux kernel to support kvm on arm 32-bit devices and currently has released builds of Linux kernel version 5.4.257 with kvm support for armv7 using source from this location:
 
 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-5.4.257.tar.gz
 
@@ -9,7 +11,7 @@ The 5.4.y kernel series is chosen since it is the latest LTS kernel series to st
 
 [Goodbye KVM/arm](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=463050599742a89e0508355e626e032e8d0dab8d)
 
-The two experimental builds are compiled with support for kvm for testing on the Samsung chromebook snow (SAMSUNG XE303C12-A01US Samsung Series 3 Chromebook XE303C12 - Exynos 5 1.7 GHz). See the latest release page for more details about these builds. As noted on the release page, they are not tested yet.
+The two experimental builds are compiled with support for kvm for testing on the Samsung chromebook snow . See the latest release page for more details about these builds. As noted on the release page, they are not tested yet.
 ## Using the scripts to build a kernel
 The kernels are built in a chroot using scripts. Only 5.4 armv7 kernels are supported and they can be cross-compiled on an x86_64 host. The scripts should automatically detect if it needs to install the cross compilers. In fact, so far, only cross compiling armv7 kernels on an x86_64 host has been tested. Root privileges are required to enter the chroot. The preferred way to run the scripts as root is by using sudo, and this will cause the build directory to be mounted in the chroot and in the host file system under the sudo user's home directory. Otherwise, the build directory will be mounted in the chroot and in the host file system in root's home directory, which is presumed to be /root in the scripts. Currently the scripts use bash and have not been tested with other shells.
 ### Create a chroot: $ sudo scripts/create-chroot name

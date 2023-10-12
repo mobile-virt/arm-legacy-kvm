@@ -1,6 +1,7 @@
 #!/bin/bash
 
-PKG=tar-pkg
+#PKG=tar-pkg
+PKG=deb-pkg
 LINUX_VERSION=5.4.258
 LINUX_URL=https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-${LINUX_VERSION}.tar.gz
 LOADADDR=0x42004000
@@ -88,31 +89,8 @@ popd
 
 cp -p ${CONFIG_FILE} ${BUILD_DIR}/linux-${LINUX_VERSION}/.config
 chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make ${PKG}"
-chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make LOADADDR=${LOADADDR} uImage"
 
-# Add the uImage to the tarball with ownership of root:root
-pushd ${BUILD_DIR}/linux-${LINUX_VERSION}
-KERNELRELEASE=$(cat include/config/kernel.release)
-chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; mkdir boot; cp -p arch/${ARCH}/boot/uImage boot/uImage-${KERNELRELEASE}"
-chown root:root boot/uImage-${KERNELRELEASE}
-tar rfp linux-${KERNELRELEASE}-${ARCH}.tar boot/uImage-${KERNELRELEASE}
-
-# Create initrd.img and add it to the tarball
-chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make"
-
-# Must be root inside the chroot to do make install
-cat .config | grep ^CONFIG_MODULES=y && \
-chroot ${CHROOT_DIR} su - -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make modules_install"
-
-chroot ${CHROOT_DIR} su - -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make install"
-chroot ${CHROOT_DIR} su - -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; cp -p /boot/initrd.img-${KERNELRELEASE} boot"
-chroot ${CHROOT_DIR} su - -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; tar rfp linux-${KERNELRELEASE}-${ARCH}.tar boot/initrd.img-${KERNELRELEASE}"
-rm -rf boot
-gzip linux-${KERNELRELEASE}-${ARCH}.tar
-mv linux-${KERNELRELEASE}-${ARCH}.tar.gz ..
-popd
-
-echo "Build script completed. Result of build: ${BUILD_DIR}/linux-${KERNELRELEASE}-${ARCH}.tar.gz"
+echo "Build script completed. Result of build:Debian packages in ${BUILD_DIR} with version ${KERNELRELEASE}"
 
 # After build, login to look at the build
 need_root=N

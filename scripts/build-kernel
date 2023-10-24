@@ -15,6 +15,7 @@ if [ ! ${CONFIG_FILE} ]; then echo "error: no config file given on command line"
 CHROOT_DIR=/srv/chroot/${CHROOT_NAME}
 PKG_CACHE_DIR=/srv/chroot/${CHROOT_NAME}-pkg-cache
 PATCH_DIR=${PWD}/patches
+FILES_DIR=${PWD}/files
 
 if [ ! -e ${CONFIG_FILE} ]; then echo "error: config file ${CONFIG_FILE} not found"; exit 1; fi
 if [ ! -e ${CHROOT_DIR} ]; then echo "error: chroot ${CHROOT_NAME} not found"; exit 1; fi
@@ -80,22 +81,31 @@ echo " Done"
 grep _arch ${BUILD_DIR}/linux-${LINUX_VERSION}/scripts/package/mkspec || \
 (pushd ${BUILD_DIR}/linux-${LINUX_VERSION}; patch -p1 < ${PATCH_DIR}/rpm-pkg-define-_arch-conditionally.patch; popd)
 
-# Tweak what goes in a tar package
 pushd ${BUILD_DIR}/linux-${LINUX_VERSION}
+# Tweak what goes in a tar package
 patch -p1 < ${PATCH_DIR}/buildtar-add-dtbs.patch
 patch -p1 < ${PATCH_DIR}/modules-install-no-links.patch
+# Copy files needed for chromebook images
+cp -p ${FILES_DIR}/cmdline ${FILES_DIR}/kernel.its .
 popd
 
 cp -p ${CONFIG_FILE} ${BUILD_DIR}/linux-${LINUX_VERSION}/.config
 chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make ${PKG}"
 chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make LOADADDR=${LOADADDR} uImage"
 
-# Add the uImage to the tarball with ownership of root:root
+# Chromebook specific steps
+chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; dd if=/dev/zero of=bootloader.bin bs=512 count=1"
+chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; mkimage -D '-I dts -O dtb -p 2048' -f kernel.its kernel.itb"
+chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; vbutil_kernel --pack vmlinux.kpart --keyblock /usr/share/vboot/devkeys/kernel.keyblock --signprivate /usr/share/vboot/devkeys/kernel_data_key.vbprivk --version 1 --config cmdline --bootloader bootloader.bin --vmlinuz kernel.itb --arch arm"
+
+# Add the uImage and vmlinux.kpart to the tarball with ownership of root:root
 pushd ${BUILD_DIR}/linux-${LINUX_VERSION}
 KERNELRELEASE=$(cat include/config/kernel.release)
 chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; mkdir boot; cp -p arch/${ARCH}/boot/uImage boot/uImage-${KERNELRELEASE}"
 chown root:root boot/uImage-${KERNELRELEASE}
-tar rfp linux-${KERNELRELEASE}-${ARCH}.tar boot/uImage-${KERNELRELEASE}
+chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; cp -p vmlinux.kpart boot/vmlinux.kpart-${KERNELRELEASE}"
+chown root:root boot/vmlinux.kpart-${KERNELRELEASE}
+tar rfp linux-${KERNELRELEASE}-${ARCH}.tar boot/uImage-${KERNELRELEASE} boot/vmlinux.kpart-${KERNELRELEASE}
 
 # Create initrd.img and add it to the tarball
 chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}/linux-${LINUX_VERSION}; make"

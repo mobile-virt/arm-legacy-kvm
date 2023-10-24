@@ -67,6 +67,7 @@ fi
 # Install libncurses-dev for make nconfig, u-boot-tools for make uImage, rpm for rpm-pkg target
 chroot ${CHROOT_DIR} apt-get install -y libncurses-dev
 chroot ${CHROOT_DIR} apt-get install -y u-boot-tools
+chroot ${CHROOT_DIR} apt-get install -y liblz4-tool vboot-kernel-utils
 chroot ${CHROOT_DIR} apt-get install -y rpm
 
 # Enable building without root privileges and use SUDO_USER if SUDO_USER exists

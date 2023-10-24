@@ -41,7 +41,7 @@ fi
 # If the build directory can be mounted in the host filesystem and it's not mounted, mount it
 # This will require an entry for ${BUILD_DIR} in /etc/fstab or similar but this is
 # entirely optional but might be useful when additional disk space is needed for the build
-mount | grep ${BUILD_DIR} || mount ${BUILD_DIR} && \
+mount | grep ${BUILD_DIR} || mount ${BUILD_DIR} >/dev/null 2>&1 && \
 echo "Build dir ${BUILD_DIR} mounted in the host filesystem"
 
 # Bind mounts

@@ -1,7 +1,8 @@
 #!/bin/bash
 
 PKG=tar-pkg
-LINUX_VERSION=5.4.258
+LINUX_VERSION=$3
+if [ x${LINUX_VERSION} = "x" ]; then LINUX_VERSION=5.4.258; fi
 LINUX_URL=https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-${LINUX_VERSION}.tar.gz
 LOADADDR=0x42004000
 # XXX It would be better to not need to set ARCH here
@@ -78,13 +79,25 @@ chroot ${CHROOT_DIR} su - ${SUDO_USER} -c "cd ${BUILD_DIR}; tar xfpz linux-${LIN
 echo " Done"
 
 # Older versions of linux are missing a patch to fix FTBFS of the rpm packages
-grep _arch ${BUILD_DIR}/linux-${LINUX_VERSION}/scripts/package/mkspec || \
+grep -q _arch ${BUILD_DIR}/linux-${LINUX_VERSION}/scripts/package/mkspec || \
 (pushd ${BUILD_DIR}/linux-${LINUX_VERSION}; patch -p1 < ${PATCH_DIR}/rpm-pkg-define-_arch-conditionally.patch; popd)
 
 pushd ${BUILD_DIR}/linux-${LINUX_VERSION}
 # Tweak what goes in a tar package
+cat Makefile | grep ^VERSION | grep -q 6 && \
+patch -p1 < ${PATCH_DIR}/buildtar.patch
+cat Makefile | grep ^VERSION | grep -q 5 && \
 patch -p1 < ${PATCH_DIR}/buildtar-add-dtbs.patch
+cat Makefile | grep ^VERSION | grep -q 6 && \
+patch -p1 < ${PATCH_DIR}/modules-install-no-links-6.patch
+cat Makefile | grep ^VERSION | grep -q 5 && \
 patch -p1 < ${PATCH_DIR}/modules-install-no-links.patch
+# A patch for 6.1 from hexdump0815
+cat Makefile | grep ^VERSION | grep -q 6 && \
+patch -p1 < ${PATCH_DIR}/pmos-exynos-v6.1.patch
+# A patch to get some info for debugging black screen with Xen
+cat Makefile | grep ^VERSION | grep -q 6 && \
+patch -p1 < ${PATCH_DIR}/print_dma_ops.patch
 # Copy files needed for chromebook images
 cp -p ${FILES_DIR}/cmdline ${FILES_DIR}/kernel.its .
 popd

@@ -1,0 +1,11 @@
+--- a/drivers/gpu/drm/exynos/exynos_drm_dma.c	2023-10-19 17:08:58.000000000 -0400
++++ b/drivers/gpu/drm/exynos/exynos_drm_dma.c.new	2023-10-28 13:34:06.867868689 -0400
+@@ -45,6 +45,8 @@
+ 	struct exynos_drm_private *priv = drm_dev->dev_private;
+ 	int ret = 0;
+ 
++	DRM_INFO("dma_ops(priv->dma_dev): %pS, dma_ops(subdrv_dev): %pS\n",
++		get_dma_ops(priv->dma_dev), get_dma_ops(subdrv_dev));
+ 	if (get_dma_ops(priv->dma_dev) != get_dma_ops(subdrv_dev)) {
+ 		DRM_DEV_ERROR(subdrv_dev, "Device %s lacks support for IOMMU\n",
+ 			  dev_name(subdrv_dev));

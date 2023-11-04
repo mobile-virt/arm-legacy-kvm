@@ -1,0 +1,28 @@
+This patch fixes this error on Chromebook Snow (and probably some other
+exynos devices) in Linux Xen dom0:
+
+[    2.606999] exynos-mixer 14450000.mixer: [drm:exynos_drm_register_dma] *ERROR* Device 14450000.mixer lacks support for IOMMU
+[    2.607044] exynos-drm exynos-drm: failed to bind 14450000.mixer (ops 0xc0d97554): -22
+[    2.607162] exynos-drm exynos-drm: adev bind failed: -22
+[    2.607183] exynos-dp: probe of 145b0000.dp-controller failed with error -22
+
+The error completely disables all video output.
+
+Thanks to Julien Grall, Marek Szyprowski, and Stefano Stabellini for their help
+in debugging this error.
+
+diff --git a/arch/arm/mm/dma-mapping.c.orig b/arch/arm/mm/dma-mapping.c
+index 8831403..9a5e524 100644
+--- a/arch/arm/mm/dma-mapping.c.orig
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1848,8 +1848,8 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 
+ 	if (iommu)
+ 		arm_setup_iommu_dma_ops(dev, dma_base, size, iommu, coherent);
+-
+-	xen_setup_dma_ops(dev);
++	else
++		xen_setup_dma_ops(dev);
+ 	dev->archdata.dma_ops_setup = true;
+ }
+ 

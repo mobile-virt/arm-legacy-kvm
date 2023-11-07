@@ -1,4 +1,4 @@
-# arm-legacy-kvm
+# arm-xen-kvm
 This repository is for enabling support for kvm on older devices and is inspired by the work of @Marietto2008 to improve support for virtualization on arm chromebooks and related arm devices. This repository is specifically for supporting kvm on arm 32-bit chromebooks such as the chromebook snow (SAMSUNG XE303C12-A01US Samsung Series 3 Chromebook XE303C12 - Exynos 5 1.7 GHz).
 
 Thanks to @Marietto2008 for testing and debugging work that has resulted in discovering important Linux kernel build parameters such as the correct settings in the config file, the correct setting of the uImage LOADADDR, the kernel and u-boot versions that have kvm support, and many other helpful hints.

@@ -1,0 +1,130 @@
+This patch enables building Debian package qemu-system-xen for
+armhf.
+
+It works with version 7.2+dfsg-7+deb12u2
+
+This is tested without cross-building
+
+Build dependencies are not as many as for a full qemu source build
+
+These should be close to what is needed:
+
+sudo apt-get install devscripts
+sudo apt-get install meson
+sudo apt-get install libxen-dev
+sudo apt-get install libjpg-dev
+sudo apt-get install libjpeg-dev
+sudo apt-get install libseccomp-dev
+sudo apt-get install libcap-ng-dev
+sudo apt-get install libspice-server-dev
+sudo apt-get install libusb-1.0-0-dev
+
+Run dependency:
+
+sudo apt-get install qemu-system-data
+
+Quick howto:
+
+Download qemu-system-xen-build-armhf.patch into current directory
+
+Then:
+
+apt-get source qemu
+cd qemu-7.2+dfsg
+patch -p1 < ../qemu-system-xen-build-armhf.patch
+fakeroot debian/rules clean
+make -f debian/rules package-xen
+cd ..
+
+The package should be in the current directory
+
+Optional:
+
+rm -r qemu-7.2+dfsg
+
+--- a/debian/rules	2023-08-17 05:33:57.000000000 -0400
++++ b/debian/rules	2023-11-07 10:41:04.269495646 -0500
+@@ -317,7 +317,11 @@
+ endif
+ 
+ ##############################################
+-# xen build (amd64 arch only, i386-softmmu target only)
++# xen build (amd64 and armhf arch only, i386-softmmu target only)
++# Only amd64 works with these options
++ifeq (${DEB_HOST_ARCH}-${enable_system},amd64-enable)
++QEMU_XEN_CONFIGURE_OPTIONS = --enable-avx2 --enable-avx512f
++endif
+ configure-xen: b/xen/configured
+ b/xen/configured: configure
+ 	# system build for qemu-system-xen
+@@ -326,7 +330,6 @@
+ 	    ../../configure ${common_configure_opts} \
+ 		--disable-blobs --disable-docs --disable-tools \
+ 		--without-default-features \
+-		--enable-avx2 --enable-avx512f \
+ 		--enable-xen --target-list=i386-softmmu \
+ 		--enable-xen-pci-passthrough \
+ 		--disable-tcg --disable-kvm \
+@@ -339,14 +342,16 @@
+ 	touch $@
+ build-xen: b/xen/built
+ b/xen/built: b/xen/configured
+-	$(MAKE) -C b/xen V=${V} qemu-system-i386
++	$(MAKE) -C b/xen qemu-system-i386
+ 	touch $@
+ install-xen: b/xen/built
+ 	install -D b/xen/qemu-system-i386 \
+ 	  debian/qemu-system-xen${QEMU_XEN}
+-ifeq (${DEB_HOST_ARCH}-${enable_system},amd64-enable)
++ifneq ($(filter ${DEB_HOST_ARCH},amd64 armhf),)
++ifeq (-${enable_system},-enable)
+ qemu-builds += xen
+ endif
++endif
+ 
+ ##############################################
+ # linux-user-static build
+@@ -633,6 +638,26 @@
+ 	dh $@
+ build: build-arch build-indep
+ 
++package-xen: b/xen/built
++	install -D b/xen/qemu-system-i386 \
++	  debian/qemu-system-xen${QEMU_XEN}
++	mkdir -p debian/qemu-system-xen/usr/share/doc/qemu-system-xen
++	mkdir -p debian/qemu-system-xen/DEBIAN
++	echo \# Older entries have been removed from this changelog. > chlg.ext.tmp
++	echo \# To read the complete changelog use \`apt changelog qemu-system-xen\`. >> chlg.ext.tmp
++	sed 1493q debian/changelog > chlg.tmp
++	cat chlg.tmp chlg.ext.tmp | gzip -9 - > \
++	  debian/qemu-system-xen/usr/share/doc/qemu-system-xen/changelog.Debian.gz
++	rm chlg.tmp chlg.ext.tmp
++	cp -p debian/copyright debian/qemu-system-xen/usr/share/doc/qemu-system-xen/copyright
++	touch -r debian/qemu-system-xen/usr/share/doc/qemu-system-xen/copyright \
++		debian/qemu-system-xen/usr/share/doc/qemu-system-xen/changelog.Debian.gz
++	fakeroot dh_strip > /dev/null 2>&1
++	dpkg-shlibdeps debian/qemu-system-xen${QEMU_XEN}
++	dpkg-gencontrol -pqemu-system-xen -Pdebian/qemu-system-xen -UMulti-Arch
++	fakeroot dh_md5sums
++	dpkg-deb --root-owner-group -b debian/qemu-system-xen ..
++
+ clean:	debian/control
+ 	dh_clean \
+ 		b/ \
+--- a/debian/control-in	2023-08-17 05:33:57.000000000 -0400
++++ b/debian/control-in	2023-11-07 11:34:11.791237030 -0500
+@@ -408,11 +408,11 @@
+  usage on systems which supports it.
+ 
+ Package: qemu-system-xen
+-Architecture: amd64
++Architecture: amd64 armhf
+ Multi-Arch: no
+ # do we really need qemu-system-data? keymaps only?
+-Depends: ${shlibs:Depends}, ${misc:Depends}, qemu-system-data (>> ${source:Upstream-Version}~),
+- seabios, ipxe-qemu
++Depends: ${shlibs:Depends}, qemu-system-data (>> ${source:Upstream-Version}~),
++ seabios [amd64], ipxe-qemu [amd64]
+ Recommends: qemu-utils,
+  ovmf,
+ :ubuntu:# For the transition from the former qemu-system-x86-xen name

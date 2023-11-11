@@ -1,0 +1,84 @@
+commit c87f6b422f17a2ec70d8c6335b15fdedca2a6369
+Author: Chuck Zmudzinski <brchuckz@aol.com>
+Date:   Fri Nov 10 22:07:53 2023 -0500
+
+    arm/mm: add option to prefer iommu_ops for DMA on Xen
+    
+    Xen normally uses an IOMMU to provide isolation between guests. There
+    are some IOMMUs that Xen does not use, and in these cases Xen will
+    expose the IOMMU to dom0.
+    
+    When Xen exposes an IOMMU to Linux, Linux currently uses
+    xen_swiotlb_dma_ops for DMA for all devices when xen_swiotlb is detected.
+    The new config option to allow Linux to use an IOMMU on Xen is
+    ARM_DMA_USE_IOMMU_XEN and it depends on SWIOTLB_XEN and ARM_DMA_USE_IOMMU.
+    
+    Enabling the new option fixes this error when attaching the Exynos
+    mixer in Linux dom0 on Xen on the Chromebook Snow (and probably on
+    other devices that use the Exynos mixer):
+    
+    [drm] Exynos DRM: using 14400000.fimd device for DMA mapping operations
+    exynos-drm exynos-drm: bound 14400000.fimd (ops 0xc0d96354)
+    exynos-mixer 14450000.mixer: [drm:exynos_drm_register_dma] *ERROR* Device
+                                 14450000.mixer lacks support for IOMMU
+    exynos-drm exynos-drm: failed to bind 14450000.mixer (ops 0xc0d97554): -22
+    exynos-drm exynos-drm: adev bind failed: -22
+    exynos-dp: probe of 145b0000.dp-controller failed with error -22
+    
+    Without a fix, this error totally disables all video output on both the
+    built-in display and the HDMI port.
+    
+    The new config option is not set by default because it is likely some
+    devices that use IOMMU dma_ops on Xen will cause DMA errors and memory
+    corruption when Xen PV block and network drivers are in use on the system.
+    
+    Link: https://lore.kernel.org/xen-devel/acfab1c5-eed1-4930-8c70-8681e256c820@netscape.net/
+    
+    Signed-off-by: Chuck Zmudzinski <brchuckz@aol.com>
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index d7909091cf97..dcf9b01b7811 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1789,6 +1789,12 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	if (iommu)
+ 		arm_setup_iommu_dma_ops(dev, dma_base, size, iommu, coherent);
+ 
++#ifdef CONFIG_ARM_DMA_USE_IOMMU_XEN
++	if (dev->dma_ops == &iommu_ops) {
++		dev->archdata.dma_ops_setup = true;
++		return;
++	}
++#endif
+ 	xen_setup_dma_ops(dev);
+ 	dev->archdata.dma_ops_setup = true;
+ }
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index d5d7c402b651..430bb12c07b7 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -181,6 +181,24 @@ config SWIOTLB_XEN
+ 	select DMA_OPS
+ 	select SWIOTLB
+ 
++config ARM_DMA_USE_IOMMU_XEN
++	bool "Prefer IOMMU DMA ops on Xen"
++	depends on SWIOTLB_XEN
++	depends on ARM_DMA_USE_IOMMU
++	help
++	  Normally on Xen, the IOMMU is used by Xen and not exposed to
++	  Linux. Some Arm systems such as Exynos have an IOMMU that
++	  Xen does not use so the IOMMU is exposed to Linux in those
++	  cases. This option enables Linux to use the IOMMU instead of
++	  using the Xen swiotlb_dma_ops for DMA on Xen.
++
++	  Say N here unless support for one or more devices that use
++	  IOMMU ops instead of Xen swiotlb ops for DMA is needed and the
++	  devices that use the IOMMU do not cause any problems on the
++	  Xen platform in use. Enabling this option is useful for fixing
++	  an IOMMU error that causes no video output when attaching the
++	  Exynos mixer to Linux running as dom0 on Xen.
++
+ config XEN_PCI_STUB
+ 	bool
+ 

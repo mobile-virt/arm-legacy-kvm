@@ -100,7 +100,7 @@ cat Makefile | grep ^VERSION | grep -q 6 && \
 patch -p1 < ${PATCH_DIR}/print_dma_ops.patch
 # Fix the black screen with Xen
 cat Makefile | grep ^VERSION | grep -q 6 && \
-patch -p1 < ${PATCH_DIR}/prefer-iommu-dma-ops-on-xen.patch
+patch -p1 < ${PATCH_DIR}/arm-mm-add-option-prefer-iommu-dma-on-xen.patch
 # Copy files needed for chromebook images
 cp -p ${FILES_DIR}/cmdline ${FILES_DIR}/kernel.its .
 popd
